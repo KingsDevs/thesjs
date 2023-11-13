@@ -30,15 +30,6 @@ class CustomFeatureExtractor(BaseFeaturesExtractor):
 
         self.multihead_attention = nn.MultiheadAttention(embed_dim=hidden_size*2, num_heads=4, batch_first=True)
 
-    def extract_feature(self, image_depth):
-        image_depth = image_depth.unsqueeze(0)
-        extracted_feature = self.cnn(image_depth)
-        return extracted_feature
-    
-    def init_hidden(self, batch_size=1):
-        h0 = torch.zeros(self.num_layers * 2, batch_size, self.hidden_size).to(self.device)
-        c0 = torch.zeros(self.num_layers * 2, batch_size, self.hidden_size).to(self.device)
-        return (h0, c0)
 
     def forward(self, observations: torch.Tensor) -> torch.Tensor:
         images_depth = observations['frames']
@@ -50,8 +41,6 @@ class CustomFeatureExtractor(BaseFeaturesExtractor):
 
         # Apply CNN
         cnn_outputs = self.cnn(images_depth)
-
-        # Reshape to (batch_size, num_frames, channels, height, width)
         cnn_outputs = cnn_outputs.view(batch_size, self.num_frames, 64)
 
         # Apply LSTM
@@ -61,7 +50,6 @@ class CustomFeatureExtractor(BaseFeaturesExtractor):
         queries = self.query(lstm_out)
         keys = self.key(lstm_out)
         values = self.value(lstm_out)
-
         weighted_context, _ = self.multihead_attention(queries, keys, values)
         weighted_context = weighted_context.view(batch_size, -1)
 
