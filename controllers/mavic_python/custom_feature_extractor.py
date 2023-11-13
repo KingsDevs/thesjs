@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from gymnasium import spaces
-from self_attention import SelfAttention
 
 class CustomFeatureExtractor(BaseFeaturesExtractor):
     def __init__(self, observation_space: spaces.Dict, features_dim: int = 64, hidden_size: int = 256, num_layers: int = 4, num_frames: int = 7):
@@ -25,7 +24,11 @@ class CustomFeatureExtractor(BaseFeaturesExtractor):
         self.bilstm = nn.LSTM(64, hidden_size, num_layers, batch_first=True, bidirectional=True)
         self.hidden = self.init_hidden()
 
-        self.attention = SelfAttention(hidden_size * 2)
+        self.query = nn.Linear(hidden_size * 2, hidden_size * 2, device=self.device)
+        self.key = nn.Linear(hidden_size * 2, hidden_size * 2, device=self.device)
+        self.value = nn.Linear(hidden_size * 2, hidden_size * 2, device=self.device)
+
+        self.multihead_attention = nn.MultiheadAttention(embed_dim=hidden_size*2, num_heads=4, batch_first=True)
 
     def extract_feature(self, image_depth):
         image_depth = image_depth.unsqueeze(0)
@@ -49,19 +52,17 @@ class CustomFeatureExtractor(BaseFeaturesExtractor):
         cnn_outputs = self.cnn(images_depth)
 
         # Reshape to (batch_size, num_frames, channels, height, width)
-        cnn_outputs = cnn_outputs.view(batch_size, self.num_frames, -1, 8, 8)
-
-        # Swap axes to (batch_size, channels, num_frames, height, width)
-        cnn_outputs = cnn_outputs.permute(0, 2, 1, 3, 4)
-
-        # Flatten the channels and num_frames dimensions
-        cnn_outputs = cnn_outputs.view(batch_size, -1, 64)
+        cnn_outputs = cnn_outputs.view(batch_size, self.num_frames, 64)
 
         # Apply LSTM
         lstm_out, _ = self.bilstm(cnn_outputs)
 
         # Apply Attention
-        weighted_context = self.attention(lstm_out)
+        queries = self.query(lstm_out)
+        keys = self.key(lstm_out)
+        values = self.value(lstm_out)
+
+        weighted_context, _ = self.multihead_attention(queries, keys, values)
         weighted_context = weighted_context.view(batch_size, -1)
 
         return weighted_context
