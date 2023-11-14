@@ -50,7 +50,7 @@ def main():
     )
     total_timestep = 1000000
 
-    log_dir = "results/train6/"
+    log_dir = "results/train1/"
     os.makedirs(log_dir, exist_ok=True)
 
     checkpoint_callback = CheckpointCallback(
