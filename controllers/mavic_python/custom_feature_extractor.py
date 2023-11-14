@@ -22,7 +22,6 @@ class CustomFeatureExtractor(BaseFeaturesExtractor):
         )
 
         self.bilstm = nn.LSTM(64, hidden_size, num_layers, batch_first=True, bidirectional=True)
-        self.hidden = self.init_hidden()
 
         self.query = nn.Linear(hidden_size * 2, hidden_size * 2, device=self.device)
         self.key = nn.Linear(hidden_size * 2, hidden_size * 2, device=self.device)
@@ -51,7 +50,7 @@ class CustomFeatureExtractor(BaseFeaturesExtractor):
         keys = self.key(lstm_out)
         values = self.value(lstm_out)
         weighted_context, _ = self.multihead_attention(queries, keys, values)
-        weighted_context = weighted_context.view(batch_size, -1)
+        weighted_context = weighted_context.reshape(batch_size, -1)
 
         return weighted_context
 
