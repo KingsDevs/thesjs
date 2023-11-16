@@ -66,3 +66,44 @@ class CustomFeatureExtractor(BaseFeaturesExtractor):
         weighted_context = weighted_context.reshape(batch_size, -1)
 
         return weighted_context
+    
+
+class CustomFeatureExtractorCNNOnly(BaseFeaturesExtractor):
+    def __init__(self, observation_space: spaces.Dict, features_dim: int = 64, hidden_size: int = 256, num_layers: int = 4):
+        super().__init__(observation_space, features_dim=64)
+        self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+
+        self.num_layers = num_layers
+        self.hidden_size = hidden_size
+
+        self.cnn = nn.Sequential(
+            nn.Conv2d(in_channels=1, out_channels=64, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm2d(64),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            
+            nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm2d(128),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            
+            nn.Conv2d(in_channels=128, out_channels=256, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm2d(256),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            
+            nn.Flatten(),
+            nn.Linear(256 * 8 * 8, 64)  # Adjusted fully connected layer
+        )
+
+
+    def forward(self, observations: torch.Tensor) -> torch.Tensor:
+        image_depth = observations
+
+        # Get batch size dynamically
+        batch_size = image_depth.size(0)
+
+        cnn_outputs = self.cnn(image_depth.unsqueeze(0))
+        features = cnn_outputs.reshape(batch_size, -1)
+
+        return features
