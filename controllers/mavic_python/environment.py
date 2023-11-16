@@ -35,7 +35,7 @@ class OpenAIGymEnvironment(Supervisor, SimpleMultiObsEnv):
             'other_observations': spaces.Box(low=-np.inf, high=np.inf, shape=(number_of_stack_images, 5), dtype=np.float32)
         })
 
-        self.__stack_images = np.zeros(
+        self.__stack_images = np.ones(
             (number_of_stack_images, 64, 64),
             dtype=np.float32
         )
@@ -139,9 +139,12 @@ class OpenAIGymEnvironment(Supervisor, SimpleMultiObsEnv):
         self.__original_position = np.array(self.getSelf().getField('translation').getSFVec3f())[:2]
         self.previous_distance = 0.0
 
+        self.__stack_images = np.ones((self.__number_of_stack_images, 64, 64), dtype=np.float32)
+        self.__other_observations = np.zeros((self.__number_of_stack_images, 5), dtype=np.float32)
+
         observation = {
-            'frames': np.zeros((self.__number_of_stack_images, 64, 64), dtype=np.float32),
-            'other_observations': np.zeros((self.__number_of_stack_images, 5), dtype=np.float32) 
+            'frames': np.copy(self.__stack_images),
+            'other_observations': np.copy(self.__other_observations)
         }
 
         self.state = observation
@@ -226,20 +229,21 @@ class OpenAIGymEnvironment(Supervisor, SimpleMultiObsEnv):
         normalized_depth_image = depth_image_np / self.__range_finder.getMaxRange()
         normalized_depth_image = normalized_depth_image.reshape(self.__range_finder.getWidth(), self.__range_finder.getHeight())
         
-        self.__stack_images = np.roll(self.__stack_images, shift=1, axis=0)
-        self.__stack_images[0, :, :] = normalized_depth_image
+        if self.hasTakeOff:
+            self.__stack_images = np.roll(self.__stack_images, shift=1, axis=0)
+            self.__stack_images[0, :, :] = normalized_depth_image
 
-        velocity = self.__gps.getSpeed()
-        roll = self.__imu.getRollPitchYaw()[0]
-        pitch = self.__imu.getRollPitchYaw()[1]
-        roll_acceleration = self.__gyro.getValues()[0]
-        pitch_acceleration = self.__gyro.getValues()[1]
+            velocity = self.__gps.getSpeed()
+            roll = self.__imu.getRollPitchYaw()[0]
+            pitch = self.__imu.getRollPitchYaw()[1]
+            roll_acceleration = self.__gyro.getValues()[0]
+            pitch_acceleration = self.__gyro.getValues()[1]
 
-        self.__other_observations = np.roll(self.__other_observations, shift=1, axis=0)
-        self.__other_observations[0, :] = np.array([velocity, roll, pitch, roll_acceleration, pitch_acceleration])
+            self.__other_observations = np.roll(self.__other_observations, shift=1, axis=0)
+            self.__other_observations[0] = np.array([velocity, roll, pitch, roll_acceleration, pitch_acceleration])
 
-        self.state['frames'] = self.__stack_images
-        self.state['other_observations'] = self.__other_observations
+            self.state['frames'] = self.__stack_images
+            self.state['other_observations'] = self.__other_observations
 
         done = False
         #reward
@@ -255,9 +259,9 @@ class OpenAIGymEnvironment(Supervisor, SimpleMultiObsEnv):
 
 
         if self.hasTakeOff:
-            # if current_distance - self.previous_distance > 0.004:
-            reward += (current_distance - self.previous_distance) + 0.8 * forward_velocity
-            self.previous_distance = current_distance
+            if current_distance - self.previous_distance > 0.01:
+                reward += (current_distance - self.previous_distance) + 0.8 * forward_velocity
+                self.previous_distance = current_distance
 
 
         if collided:
@@ -273,11 +277,3 @@ class OpenAIGymEnvironment(Supervisor, SimpleMultiObsEnv):
 
 
         return self.state, reward, done, False, {}
-
-
-    
-        
-
-        
-
-        

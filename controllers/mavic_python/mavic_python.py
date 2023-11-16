@@ -7,7 +7,6 @@ from custom_feature_extractor import CustomFeatureExtractor
 import os
 
 
-
 def main():
     num_frames = 7
 
@@ -19,11 +18,11 @@ def main():
 
     # policy_kwargs = dict(
     #     num_classes=4,
-    #     hidden_size=256,
-    #     num_layers=4,
-    #     num_frames=num_frames,
-    #     dropout_prob=0.3
-    # )
+    # #     hidden_size=256,
+    # #     num_layers=4,
+    # #     num_frames=num_frames,
+    # #     dropout_prob=0.3
+    # # )
 
     policy_kwargs = dict(
         features_extractor_class=CustomFeatureExtractor,
@@ -37,7 +36,7 @@ def main():
 
 
     model = PPO(
-        CustomPolicy, 
+        'MultiInputPolicy', 
         env, 
         n_steps=1000, 
         verbose=1,
@@ -69,9 +68,9 @@ def main():
 
     obs, info = env.reset()
     for _ in range(100000):
-        action, _ = model.predict(obs, deterministic=True)
+        # action, _ = model.predict(obs, deterministic=True)
         # action = random.randint(0,7)
-        # action = 0
+        action = 0
         obs, reward, done, truncated, info = env.step(action)
         print(reward)
         if done:
@@ -79,4 +78,6 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
 
