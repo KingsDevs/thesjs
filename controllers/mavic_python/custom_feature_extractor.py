@@ -77,23 +77,23 @@ class CustomFeatureExtractorCNNOnly(BaseFeaturesExtractor):
         self.hidden_size = hidden_size
 
         self.cnn = nn.Sequential(
-            nn.Conv2d(in_channels=1, out_channels=64, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(in_channels=1, out_channels=16, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm2d(16),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            
+            nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm2d(32),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            
+            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
             nn.BatchNorm2d(64),
             nn.MaxPool2d(kernel_size=2, stride=2),
             
-            nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(),
-            nn.BatchNorm2d(128),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-            
-            nn.Conv2d(in_channels=128, out_channels=256, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(),
-            nn.BatchNorm2d(256),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-            
             nn.Flatten(),
-            nn.Linear(256 * 8 * 8, 64)  # Adjusted fully connected layer
+            nn.Linear(64 * 8 * 8, 64)  # Adjusted fully connected layer
         )
 
 
@@ -103,7 +103,7 @@ class CustomFeatureExtractorCNNOnly(BaseFeaturesExtractor):
         # Get batch size dynamically
         batch_size = image_depth.size(0)
 
-        cnn_outputs = self.cnn(image_depth.unsqueeze(0))
+        cnn_outputs = self.cnn(image_depth.unsqueeze(1))
         features = cnn_outputs.reshape(batch_size, -1)
 
         return features

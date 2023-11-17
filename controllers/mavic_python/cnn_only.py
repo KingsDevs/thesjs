@@ -1,7 +1,7 @@
 import sys
 from controller import Supervisor
 
-import gym
+import gymnasium as gym
 import numpy as np
 from stable_baselines3.common.envs import SimpleMultiObsEnv
 import cv2
@@ -219,21 +219,25 @@ class OpenAIGymEnvironmentOnlyCNN(Supervisor, SimpleMultiObsEnv):
         done = False
         #reward
         reward = 0
-
         collided = any(touch_sensor.getValue() for touch_sensor in self.__touch_sensors)
 
         current_position = np.array(self.getSelf().getField('translation').getSFVec3f())[:2]
         current_distance = math.sqrt((current_position[0] - self.__original_position[0]) ** 2 +
                                  (current_position[1] - self.__original_position[1]) ** 2)
+        
+        safe_pixels = normalized_depth_image[normalized_depth_image > 0.35].shape[0]
+        danger_pixels = normalized_depth_image[normalized_depth_image <= 0.35].shape[0]
  
-        if self.hasTakeOff:
-            if current_distance - self.previous_distance > 0.01:
-                reward += current_distance
-                self.previous_distance = current_distance
+        if self.hasTakeOff:     
+            # if current_distance - self.previous_distance > 0.005:
+            reward += current_distance + safe_pixels * 0.0001
+            self.previous_distance = current_distance
 
-
+        if danger_pixels >= 1800:
+            reward = -danger_pixels * 0.0001
+        
         if collided:
-            reward = -5
+            reward = -8
             print("Collided")
             done = True
         elif self.__gps.getValues()[0] < -4:
@@ -251,6 +255,7 @@ from custom_policy import CustomPolicy
 from stable_baselines3.common.callbacks import CheckpointCallback
 from custom_feature_extractor import CustomFeatureExtractorCNNOnly
 import os
+import torch
 
 
 def main():
@@ -284,7 +289,7 @@ def main():
         env, 
         n_steps=1000, 
         verbose=1,
-        learning_rate=0.001,
+        learning_rate=0.0003,
         clip_range=0.35,
         ent_coef=0.0001, 
         tensorboard_log="./PPO_Policy_Mavic", 
@@ -293,7 +298,7 @@ def main():
     )
     total_timestep = 1000000
 
-    log_dir = "results/train1/"
+    log_dir = "results/train3/"
     os.makedirs(log_dir, exist_ok=True)
 
     checkpoint_callback = CheckpointCallback(
@@ -306,13 +311,16 @@ def main():
 
     model.learn(total_timesteps=total_timestep, progress_bar=True, callback=checkpoint_callback, tb_log_name="CNNOnly")
     model.save('CnnOnlyPolicy')
+    
 
-    # model = PPO.load("results/train3/rl_model_200000_steps")
+    # model = PPO.load("results/train1/rl_model_10000_steps")
     
 
     obs, info = env.reset()
     for _ in range(100000):
         # action, _ = model.predict(obs, deterministic=True)
+        # feature = model.policy.extract_features(torch.as_tensor(obs).unsqueeze(0))
+        # print(feature)
         # action = random.randint(0,7)
         action = 0
         obs, reward, done, truncated, info = env.step(action)
