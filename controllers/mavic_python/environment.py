@@ -1,7 +1,7 @@
 import sys
 from controller import Supervisor
 
-import gym
+import gymnasium as gym
 import numpy as np
 from stable_baselines3.common.envs import SimpleMultiObsEnv
 import cv2

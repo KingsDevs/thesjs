@@ -311,7 +311,6 @@ def main():
 
     model.learn(total_timesteps=total_timestep, progress_bar=True, callback=checkpoint_callback, tb_log_name="CNNOnly")
     model.save('CnnOnlyPolicy')
-    
 
     # model = PPO.load("results/train1/rl_model_10000_steps")
     
