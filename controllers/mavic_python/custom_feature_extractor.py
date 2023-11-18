@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from gymnasium import spaces
+from stable_baselines3 import PPO
 
 class CustomFeatureExtractor(BaseFeaturesExtractor):
     def __init__(self, observation_space: spaces.Dict, features_dim: int = 64, hidden_size: int = 256, num_layers: int = 4, num_frames: int = 7):
@@ -105,5 +106,36 @@ class CustomFeatureExtractorCNNOnly(BaseFeaturesExtractor):
 
         cnn_outputs = self.cnn(image_depth.unsqueeze(1))
         features = cnn_outputs.reshape(batch_size, -1)
+
+        return features
+    
+
+class CustomFeatureExtractorCNNLSTM(BaseFeaturesExtractor):
+    def __init__(self, observation_space: spaces.Dict, features_dim: int = 64, hidden_size: int = 256, num_layers: int = 4, num_frames: int = 5):
+        super().__init__(observation_space, features_dim= hidden_size * num_frames)
+        self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+
+        self.num_layers = num_layers
+        self.hidden_size = hidden_size
+        self.num_frames = num_frames
+
+        self.cnn = PPO.load("results/train5/CnnOnlyPolicy").policy.extract_features
+        self.lstm = nn.LSTM(64, hidden_size, num_layers, batch_first=True, bidirectional=False, dropout=0.5)
+        self.hidden_state = None
+
+
+    def forward(self, observations: torch.Tensor) -> torch.Tensor:
+        images_depth = observations
+
+        # Get batch size dynamically
+        batch_size = images_depth.size(0)
+
+        cnn_outputs = torch.stack([self.cnn(images_depth[i, j, :, :].unsqueeze(0)) for i in range(batch_size) for j in range(self.num_frames)])
+        cnn_outputs = cnn_outputs.view(batch_size, self.num_frames, 64)
+
+        lstm_out, hidden_state = self.lstm(cnn_outputs, self.hidden_state)
+        self.hidden_state = hidden_state
+
+        features = lstm_out.reshape(batch_size, -1)
 
         return features
