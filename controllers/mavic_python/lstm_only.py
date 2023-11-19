@@ -241,8 +241,8 @@ class OpenAIGymEnvironmentCNNLSTM(Supervisor, SimpleMultiObsEnv):
         safe_pixels = normalized_depth_image[normalized_depth_image > 0.35].shape[0]
         danger_pixels = normalized_depth_image[normalized_depth_image <= 0.35].shape[0]
  
-        if self.hasTakeOff:     
-            if current_distance - self.previous_distance > 0.005:
+        if self.hasTakeOff:
+            if current_distance - self.previous_distance > 0.003:     
                 reward += current_distance + safe_pixels * 0.0001
                 self.previous_distance = current_distance
 
@@ -250,7 +250,7 @@ class OpenAIGymEnvironmentCNNLSTM(Supervisor, SimpleMultiObsEnv):
             reward = -danger_pixels * 0.0001
         
         if collided:
-            reward = -8
+            reward = -5
             print("Collided")
             done = True
         elif self.__gps.getValues()[0] < -4:
@@ -304,13 +304,13 @@ def main():
 
 
     model = PPO(
-        'MlpPolicy', 
+       'MlpPolicy', 
         env, 
         n_steps=1000, 
         verbose=1,
-        learning_rate=0.0003,
-        clip_range=0.35,
-        ent_coef=0.0001, 
+        learning_rate=0.0001,
+        # clip_range=0.3,
+        # ent_coef=0.0001, 
         tensorboard_log="./PPO_Policy_Mavic", 
         policy_kwargs=policy_kwargs,
         batch_size=50

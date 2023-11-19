@@ -129,12 +129,13 @@ class CustomFeatureExtractorCNNLSTM(BaseFeaturesExtractor):
 
         # Get batch size dynamically
         batch_size = images_depth.size(0)
+        # images_depth = images_depth.unsqueeze(2)
+        images_depth = images_depth.view(batch_size * self.num_frames, images_depth.size(2), images_depth.size(3))
 
-        cnn_outputs = torch.stack([self.cnn(images_depth[i, j, :, :].unsqueeze(0)) for i in range(batch_size) for j in range(self.num_frames)])
+        cnn_outputs = self.cnn(images_depth)
         cnn_outputs = cnn_outputs.view(batch_size, self.num_frames, 64)
 
-        lstm_out, hidden_state = self.lstm(cnn_outputs, self.hidden_state)
-        self.hidden_state = hidden_state
+        lstm_out, hidden_state = self.lstm(cnn_outputs)
 
         features = lstm_out.reshape(batch_size, -1)
 
