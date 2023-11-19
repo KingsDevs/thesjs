@@ -237,7 +237,7 @@ class OpenAIGymEnvironmentOnlyCNN(Supervisor, SimpleMultiObsEnv):
             reward = -danger_pixels * 0.0001
         
         if collided:
-            reward = -8
+            reward = -5
             print("Collided")
             done = True
         elif self.__gps.getValues()[0] < -4:
