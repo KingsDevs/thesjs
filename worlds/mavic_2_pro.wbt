@@ -26,9 +26,9 @@ Viewpoint {
   followSmoothness 0.2
 }
 DEF obstacle1 Wall {
-  translation -2.5 0.76 0
+  translation -2.5 1 0
   name "obstacle1"
-  size 0.2 1.5 1.2
+  size 0.2 1 1.2
 }
 TexturedBackground {
   luminosity 3
