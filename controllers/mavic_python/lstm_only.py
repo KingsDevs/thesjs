@@ -243,14 +243,14 @@ class OpenAIGymEnvironmentCNNLSTM(Supervisor, SimpleMultiObsEnv):
  
         if self.hasTakeOff:
             if current_distance - self.previous_distance > 0.003:     
-                reward += current_distance + safe_pixels * 0.0001
+                reward += current_distance + safe_pixels * 0.001
                 self.previous_distance = current_distance
 
         if danger_pixels >= 1800:
             reward = -danger_pixels * 0.0001
         
         if collided:
-            reward = -5
+            reward = -10
             print("Collided")
             done = True
         elif self.__gps.getValues()[0] < -4:
@@ -317,7 +317,7 @@ def main():
     )
     total_timestep = 2000000
 
-    log_dir = "results/train6/"
+    log_dir = "results/train9/"
     os.makedirs(log_dir, exist_ok=True)
 
     checkpoint_callback = CheckpointCallback(
