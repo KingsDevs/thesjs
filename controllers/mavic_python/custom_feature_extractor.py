@@ -112,14 +112,32 @@ class CustomFeatureExtractorCNNOnly(BaseFeaturesExtractor):
 
 class CustomFeatureExtractorCNNLSTM(BaseFeaturesExtractor):
     def __init__(self, observation_space: spaces.Dict, features_dim: int = 64, hidden_size: int = 256, num_layers: int = 4, num_frames: int = 5):
-        super().__init__(observation_space, features_dim= hidden_size * num_frames)
+        super().__init__(observation_space, features_dim= hidden_size)
         self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
         self.num_layers = num_layers
         self.hidden_size = hidden_size
         self.num_frames = num_frames
 
-        self.cnn = PPO.load("results/train5/CnnOnlyPolicy").policy.extract_features
+        self.cnn = nn.Sequential(
+            nn.Conv2d(in_channels=1, out_channels=16, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm2d(16),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            
+            nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm2d(32),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            
+            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm2d(64),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            
+            nn.Flatten(),
+            nn.Linear(64 * 8 * 8, 64)  # Adjusted fully connected layer
+        )
         self.lstm = nn.LSTM(64, hidden_size, num_layers, batch_first=True, bidirectional=False, dropout=0.5)
         self.hidden_state = None
 
@@ -129,14 +147,13 @@ class CustomFeatureExtractorCNNLSTM(BaseFeaturesExtractor):
 
         # Get batch size dynamically
         batch_size = images_depth.size(0)
-        # images_depth = images_depth.unsqueeze(2)
-        images_depth = images_depth.view(batch_size * self.num_frames, images_depth.size(2), images_depth.size(3))
+        images_depth = images_depth.view(batch_size * self.num_frames, 1, images_depth.size(2), images_depth.size(3))
 
         cnn_outputs = self.cnn(images_depth)
         cnn_outputs = cnn_outputs.view(batch_size, self.num_frames, 64)
 
         lstm_out, hidden_state = self.lstm(cnn_outputs)
 
-        features = lstm_out.reshape(batch_size, -1)
+        features = lstm_out[:, -1, :]
 
         return features

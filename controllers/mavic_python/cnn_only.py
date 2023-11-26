@@ -196,6 +196,10 @@ class OpenAIGymEnvironmentOnlyCNN(Supervisor, SimpleMultiObsEnv):
         self.__rear_left_motor.setVelocity(-rear_left_motor_input)
         self.__rear_right_motor.setVelocity(rear_right_motor_input)
 
+    @property
+    def num_envs(self):
+        # Return the number of parallel environments
+        return 1
     
     def step(self, action):
         self.step_count+=1
