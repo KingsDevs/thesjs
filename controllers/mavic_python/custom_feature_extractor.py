@@ -120,14 +120,23 @@ class CustomFeatureExtractorCNNLSTM(BaseFeaturesExtractor):
         self.num_frames = num_frames
 
         self.cnn = nn.Sequential(
-            nn.Conv2d(1, 32, kernel_size=8, stride=4, padding=0),
+            nn.Conv2d(in_channels=1, out_channels=16, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
-            nn.Conv2d(32, 64, kernel_size=4, stride=2, padding=0),
+            nn.BatchNorm2d(16),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            
+            nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
-            nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=0),
+            nn.BatchNorm2d(32),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            
+            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
-            nn.Flatten(),  # Adjusted fully connected layer
-            nn.Linear(1024, 64)
+            nn.BatchNorm2d(64),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            
+            nn.Flatten(),
+            nn.Linear(64 * 8 * 8, 64)  # Adjusted fully connected layer
         )
         self.lstm = nn.LSTM(64, hidden_size, num_layers, batch_first=True, bidirectional=False, dropout=0.5)
         # self.hidden_state = None
