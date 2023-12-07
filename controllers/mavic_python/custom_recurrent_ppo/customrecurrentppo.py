@@ -16,8 +16,8 @@ class CustomRecurrentPPO(RecurrentPPO):
         *args,
         **kwargs,
     ):
-        super().__init__(*args, **kwargs)
         self.n_seq = n_seq
+        super().__init__(*args, **kwargs)
 
     def _setup_model(self) -> None:
         self._setup_lr_schedule()

@@ -7,6 +7,7 @@ from stable_baselines3.common.envs import SimpleMultiObsEnv
 import cv2
 from gymnasium import spaces
 import math
+
 import time
 
 class OpenAIGymEnvironmentCNNLSTM(Supervisor, SimpleMultiObsEnv):
@@ -88,6 +89,9 @@ class OpenAIGymEnvironmentCNNLSTM(Supervisor, SimpleMultiObsEnv):
         self.__original_position = np.array(self.getSelf().getField('translation').getSFVec3f())[:2]
         self.previous_distance = 0.0
         self.hasTakeOff = False
+
+        self.__accumulated_rotation = 0.0
+        self.__rotation_threshold = 6.28
         
 
     def __enable_motors(self):
@@ -115,7 +119,7 @@ class OpenAIGymEnvironmentCNNLSTM(Supervisor, SimpleMultiObsEnv):
             current_obstacle_pos.setSFVec3f([current_obstacle_pos.getSFVec3f()[0], random_y_position, current_obstacle_pos.getSFVec3f()[2]])
 
     def reset_mav_pos(self):
-        random_y_position = np.random.uniform(low=-1.0, high=1.0)
+        random_y_position = np.random.uniform(low=-0.5, high=0.5)
 
         current_pos = self.getSelf().getField('translation')
         current_pos.setSFVec3f([current_pos.getSFVec3f()[0], random_y_position, current_pos.getSFVec3f()[2]])
@@ -128,7 +132,7 @@ class OpenAIGymEnvironmentCNNLSTM(Supervisor, SimpleMultiObsEnv):
 
         self.__enable_motors()  
         self.reset_mav_pos()
-        self.reset_obstacles()
+        # self.reset_obstacles()
 
         self.hasTakeOff = False
         self.__target_altitude = 0.4
@@ -139,21 +143,16 @@ class OpenAIGymEnvironmentCNNLSTM(Supervisor, SimpleMultiObsEnv):
 
         while not abs(self.__gps.getValues()[2] - self.__target_altitude) < 0.09:
             self.make_action(3)
-            normalized_depth_image = self.get_depth_image()
-            self.__stack_images = np.roll(self.__stack_images, shift=-1, axis=0)
-            self.__stack_images[-1, :, :] = normalized_depth_image
-
+            # normalized_depth_image = self.get_depth_image()
+            # self.__stack_images = np.roll(self.__stack_images, shift=-1, axis=0)
+            # self.__stack_images[-1, :, :] = normalized_depth_image
             super().step(self.__timestep)
 
         self.__original_position = np.array(self.getSelf().getField('translation').getSFVec3f())[:2]
         self.previous_distance = 0.0
 
-        
-
         observation = self.__stack_images
-
         self.state = observation
-        
         
         return observation, {}
     
@@ -217,29 +216,25 @@ class OpenAIGymEnvironmentCNNLSTM(Supervisor, SimpleMultiObsEnv):
     
     def step(self, action):
         self.step_count+=1
-
         
         #action
-
         self.make_action(action)
 
         super().step(self.__timestep)
 
         #Observations
-        normalized_depth_image = self.get_depth_image()
-        
+        normalized_depth_image = self.get_depth_image()  
         
         self.__stack_images = np.roll(self.__stack_images, shift=-1, axis=0)
         self.__stack_images[-1, :, :] = normalized_depth_image
 
-        self.state = self.__stack_images
-        
+        self.state = self.__stack_images 
 
-        if self.step_count == 3000:
-            done = True
-            reward = -50
-        else:
-            done = False
+        # if self.step_count == 2000:
+        #     done = True
+        #     reward = -50
+        # else:
+        done = False
         #reward
         reward = 0
 
@@ -251,13 +246,24 @@ class OpenAIGymEnvironmentCNNLSTM(Supervisor, SimpleMultiObsEnv):
 
         safe_pixels = normalized_depth_image[normalized_depth_image > 0.35].shape[0]
         danger_pixels = normalized_depth_image[normalized_depth_image <= 0.35].shape[0]
- 
+
+        # roll_velocity = self.__gyro.getValues()[0]
+        # pitch_velocity = self.__gyro.getValues()[1]
+
+        # if action in [1,2]:
+        #     self.__accumulated_rotation += abs(roll_velocity) + abs(pitch_velocity)
+        # else:
+        #     self.__accumulated_rotation = 0
+
         if current_distance - self.previous_distance > 0.001:     
-            reward = current_distance + safe_pixels * 0.001 if action != 3 else 0
+            reward = current_distance + safe_pixels * 0.0001 if action != 3 else 0
             self.previous_distance = current_distance
 
         if danger_pixels >= 1800:
-            reward += -danger_pixels * 0.001
+            reward = -danger_pixels * 0.00005
+
+        # if self.__accumulated_rotation >= self.__rotation_threshold:
+        #     reward += -self.__accumulated_rotation * 0.1
         
         if collided:
             reward = -10
@@ -285,7 +291,7 @@ import torch
 
 
 def main():
-    num_frames = 7
+    num_frames = 10
 
     env = OpenAIGymEnvironmentCNNLSTM(number_of_stack_images=num_frames)
     check_env(env)
@@ -306,7 +312,7 @@ def main():
         features_extractor_kwargs=dict(
             features_dim=64,
             hidden_size=256,
-            num_layers=2,
+            num_layers=3,
             num_frames=num_frames
         ),
     )
@@ -315,18 +321,18 @@ def main():
     model = PPO(
        'MlpPolicy', 
         env, 
-        n_steps=1000, 
+        # n_steps=1000, 
         verbose=1,
         learning_rate=0.0001,
-        # clip_range=0.3,
-        # ent_coef=0.0001, 
+        clip_range=0.18,
+        ent_coef=0.01, 
         tensorboard_log="./PPO_Policy_Mavic", 
         policy_kwargs=policy_kwargs,
-        batch_size=50
+        # batch_size=50
     )
     total_timestep = 2000000
 
-    log_dir = "results/train11/"
+    log_dir = "results/cnn-lstm-policy-1/"
     os.makedirs(log_dir, exist_ok=True)
 
     checkpoint_callback = CheckpointCallback(
@@ -340,7 +346,7 @@ def main():
     model.learn(total_timesteps=total_timestep, progress_bar=True, callback=checkpoint_callback, tb_log_name="CNN-LSTM")
     model.save('CNN-LSTM-Policy')
 
-    
+    # model = PPO.load("CNN-LSTM-Policy")
 
     obs, info = env.reset()
     for _ in range(100000):
@@ -350,7 +356,7 @@ def main():
         # action = random.randint(0,7)
         # action = 0
         obs, reward, done, truncated, info = env.step(action)
-        print(action)
+        # print(action)
         if done:
             obs, info = env.reset()
 

@@ -121,7 +121,7 @@ class OpenAIGymEnvironmentOnlyCNN(Supervisor, SimpleMultiObsEnv):
         self.make_action(7)
 
         self.reset_mav_pos()
-        self.reset_obstacles()
+        # self.reset_obstacles()
         self.hasTakeOff = False
         super().step(self.__timestep)
 
@@ -196,10 +196,6 @@ class OpenAIGymEnvironmentOnlyCNN(Supervisor, SimpleMultiObsEnv):
         self.__rear_left_motor.setVelocity(-rear_left_motor_input)
         self.__rear_right_motor.setVelocity(rear_right_motor_input)
 
-    @property
-    def num_envs(self):
-        # Return the number of parallel environments
-        return 1
     
     def step(self, action):
         self.step_count+=1
@@ -260,12 +256,14 @@ from stable_baselines3.common.callbacks import CheckpointCallback
 from custom_feature_extractor import CustomFeatureExtractorCNNOnly
 import os
 import torch
+from gymnasium.wrappers import FrameStack
 
 
 def main():
 
     env = OpenAIGymEnvironmentOnlyCNN()
-    check_env(env)
+    env = FrameStack(env, 10)
+    # check_env(env)
 
     print(f"observation space: {env.observation_space}")
     print(f"action space: {env.action_space}")
@@ -278,58 +276,58 @@ def main():
     # #     dropout_prob=0.3
     # # )
 
-    policy_kwargs = dict(
-        features_extractor_class=CustomFeatureExtractorCNNOnly,
-        features_extractor_kwargs=dict(
-            features_dim=64,
-            hidden_size=256,
-            num_layers=4,
-        ),
-    )
+    # policy_kwargs = dict(
+    #     features_extractor_class=CustomFeatureExtractorCNNOnly,
+    #     features_extractor_kwargs=dict(
+    #         features_dim=64,
+    #         hidden_size=256,
+    #         num_layers=4,
+    #     ),
+    # )
 
 
-    model = PPO(
-        'MlpPolicy', 
-        env, 
-        n_steps=1000, 
-        verbose=1,
-        learning_rate=0.0003,
-        clip_range=0.35,
-        ent_coef=0.0001, 
-        tensorboard_log="./PPO_Policy_Mavic", 
-        policy_kwargs=policy_kwargs,
-        batch_size=20
-    )
-    total_timestep = 1000000
+    # model = PPO(
+    #     'MlpPolicy', 
+    #     env, 
+    #     n_steps=1000, 
+    #     verbose=1,
+    #     learning_rate=0.0003,
+    #     clip_range=0.35,
+    #     ent_coef=0.0001, 
+    #     tensorboard_log="./PPO_Policy_Mavic", 
+    #     policy_kwargs=policy_kwargs,
+    #     batch_size=20
+    # )
+    # total_timestep = 1000000
 
-    log_dir = "results/train3/"
-    os.makedirs(log_dir, exist_ok=True)
+    # log_dir = "results/train3/"
+    # os.makedirs(log_dir, exist_ok=True)
 
-    checkpoint_callback = CheckpointCallback(
-        save_freq=10000,
-        save_path=log_dir,
-        name_prefix="rl_model",
-        save_replay_buffer=False,
-        save_vecnormalize=True,
-    )
+    # checkpoint_callback = CheckpointCallback(
+    #     save_freq=10000,
+    #     save_path=log_dir,
+    #     name_prefix="rl_model",
+    #     save_replay_buffer=False,
+    #     save_vecnormalize=True,
+    # )
 
-    model.learn(total_timesteps=total_timestep, progress_bar=True, callback=checkpoint_callback, tb_log_name="CNNOnly")
-    model.save('CnnOnlyPolicy')
+    # model.learn(total_timesteps=total_timestep, progress_bar=True, callback=checkpoint_callback, tb_log_name="CNNOnly")
+    # model.save('CnnOnlyPolicy')
 
-    # model = PPO.load("results/train1/rl_model_10000_steps")
+    # # model = PPO.load("results/train1/rl_model_10000_steps")
     
 
-    obs, info = env.reset()
-    for _ in range(100000):
-        # action, _ = model.predict(obs, deterministic=True)
-        # feature = model.policy.extract_features(torch.as_tensor(obs).unsqueeze(0))
-        # print(feature)
-        # action = random.randint(0,7)
-        action = 0
-        obs, reward, done, truncated, info = env.step(action)
-        print(reward)
-        if done:
-            obs, info = env.reset()
+    # obs, info = env.reset()
+    # for _ in range(100000):
+    #     # action, _ = model.predict(obs, deterministic=True)
+    #     # feature = model.policy.extract_features(torch.as_tensor(obs).unsqueeze(0))
+    #     # print(feature)
+    #     # action = random.randint(0,7)
+    #     action = 0
+    #     obs, reward, done, truncated, info = env.step(action)
+    #     print(reward)
+    #     if done:
+    #         obs, info = env.reset()
 
 if __name__ == '__main__':
     main()
