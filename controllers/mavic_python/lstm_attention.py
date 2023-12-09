@@ -284,7 +284,7 @@ from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback
-from custom_feature_extractor import CustomFeatureExtractorCNNLSTM
+from custom_feature_extractor import CustomFeatureExtractorCNNLSTMAttention
 import os
 import multiprocessing
 
@@ -313,7 +313,7 @@ def main():
     # # )
 
     policy_kwargs = dict(
-        features_extractor_class=CustomFeatureExtractorCNNLSTM,
+        features_extractor_class=CustomFeatureExtractorCNNLSTMAttention,
         features_extractor_kwargs=dict(
             features_dim=64,
             hidden_size=256,
@@ -337,7 +337,7 @@ def main():
     )
     total_timestep = 2000000
 
-    log_dir = "results/cnn-lstm-policy-1/"
+    log_dir = "results/cnn-lstm-attention-policy-1/"
     os.makedirs(log_dir, exist_ok=True)
 
     checkpoint_callback = CheckpointCallback(
@@ -348,7 +348,7 @@ def main():
         save_vecnormalize=True,
     )
 
-    model.learn(total_timesteps=total_timestep, progress_bar=True, callback=checkpoint_callback, tb_log_name="CNN-LSTM")
+    model.learn(total_timesteps=total_timestep, progress_bar=True, callback=checkpoint_callback, tb_log_name="LSTM-ATTENTION")
     model.save('CNN-LSTM-Policy')
 
     # model = PPO.load("results/rl_model_880000_steps.zip")

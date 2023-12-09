@@ -140,7 +140,7 @@ class CustomFeatureExtractorCNNLSTM(BaseFeaturesExtractor):
         )
         self.lstm = nn.LSTM(64, hidden_size, num_layers, batch_first=True, bidirectional=False, dropout=0.5)
         # self.hidden_state = None
-
+    
 
     def forward(self, observations: torch.Tensor) -> torch.Tensor:
         images_depth = observations
@@ -156,5 +156,112 @@ class CustomFeatureExtractorCNNLSTM(BaseFeaturesExtractor):
         lstm_out, hidden_state = self.lstm(cnn_outputs)
 
         features = lstm_out[:, -1, :]
+
+        return features
+    
+
+
+class CustomFeatureExtractorCNNAttentionLSTM(BaseFeaturesExtractor):
+    def __init__(self, observation_space: spaces.Dict, features_dim: int = 64, hidden_size: int = 256, num_layers: int = 4, num_frames: int = 5, num_heads: int = 4):
+        super().__init__(observation_space, features_dim=256)
+        self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+
+        self.num_layers = num_layers
+        self.hidden_size = hidden_size
+        self.num_frames = num_frames
+        self.num_heads = num_heads
+
+        self.cnn = nn.Sequential(
+            nn.Conv2d(in_channels=1, out_channels=16, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm2d(16),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            
+            nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm2d(32),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            
+            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm2d(64),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            
+            nn.Flatten(),
+            nn.Linear(64 * 8 * 8, 64)  # Adjusted fully connected layer
+        )
+
+        self.multihead_attention = nn.MultiheadAttention(embed_dim=64, num_heads=num_heads, batch_first=True)
+        self.lstm = nn.LSTM(64, hidden_size, num_layers, batch_first=True, bidirectional=False, dropout=0.3)
+
+    def forward(self, observations: torch.Tensor) -> torch.Tensor:
+        images_depth = observations
+
+        # Get batch size dynamically
+        batch_size = images_depth.size(0)
+        images_depth = images_depth.view(batch_size * self.num_frames, 1, images_depth.size(2), images_depth.size(3))
+
+        cnn_outputs = self.cnn(images_depth)
+        cnn_outputs = cnn_outputs.view(batch_size, self.num_frames, 64)
+
+        # Apply multi-head attention
+        attn_output, _ = self.multihead_attention(cnn_outputs, cnn_outputs, cnn_outputs)
+
+        lstm_out, hidden_state = self.lstm(attn_output)
+
+        features = lstm_out[:, -1, :]
+
+        return features
+
+
+class CustomFeatureExtractorCNNLSTMAttention(BaseFeaturesExtractor):
+    def __init__(self, observation_space: spaces.Dict, features_dim: int = 64, hidden_size: int = 256, num_layers: int = 4, num_frames: int = 5, num_heads: int = 4):
+        super().__init__(observation_space, features_dim=256)
+        self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+
+        self.num_layers = num_layers
+        self.hidden_size = hidden_size
+        self.num_frames = num_frames
+        self.num_heads = num_heads
+
+        self.cnn = nn.Sequential(
+            nn.Conv2d(in_channels=1, out_channels=16, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm2d(16),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            
+            nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm2d(32),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            
+            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm2d(64),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            
+            nn.Flatten(),
+            nn.Linear(64 * 8 * 8, 64)  # Adjusted fully connected layer
+        )
+
+        self.lstm = nn.LSTM(64, hidden_size, num_layers, batch_first=True, bidirectional=False, dropout=0.3)
+        self.multihead_attention = nn.MultiheadAttention(embed_dim=hidden_size, num_heads=num_heads, batch_first=True)
+
+    def forward(self, observations: torch.Tensor) -> torch.Tensor:
+        images_depth = observations
+
+        # Get batch size dynamically
+        batch_size = images_depth.size(0)
+        images_depth = images_depth.view(batch_size * self.num_frames, 1, images_depth.size(2), images_depth.size(3))
+
+        cnn_outputs = self.cnn(images_depth)
+        cnn_outputs = cnn_outputs.view(batch_size, self.num_frames, 64)
+
+        lstm_out, hidden_state = self.lstm(cnn_outputs)
+
+        # Apply multi-head attention after LSTM
+        attn_output, _ = self.multihead_attention(lstm_out, lstm_out, lstm_out)
+
+        features = attn_output[:, -1, :]
 
         return features
